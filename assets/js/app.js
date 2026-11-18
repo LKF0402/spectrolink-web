@@ -3,6 +3,7 @@
 // 物理计算一律不在此处发生，这里只做 I/O 与绘图。
 
 import { Instrument } from "./instrument.js";
+import { Instrument3D } from "./scene3d.js";
 
 // uPlot 随站点分发（不依赖第三方 CDN）
 const UPLOT_URL = new URL("../../vendor/uplot/uPlot.esm.js", import.meta.url).href;
@@ -305,7 +306,7 @@ function syncAll() {
   const nu = currentNu();
   const preset = currentPreset();     // 谱区切换后立刻以新谱区为准，避免沿用上一次的 wn0
   const p = buildParams();            // 装置图反映"当前设定"，曲线反映"最近一次计算"
-  Instrument.update({
+  const view = {
     species: preset.species,
     wn0: preset.wn0,
     span: p.span,
@@ -317,7 +318,9 @@ function syncAll() {
     nu,
     phase: state.phase,
     peak2f: res.meta.peak_2f,
-  });
+  };
+  Instrument.update(view);
+  Instrument3D.update(view);
 
   // 注意：uPlot 的 setCursor 只接受像素坐标，波数→像素必须走 valToPos
   for (const key of ["alpha", "harmonics", "calib"]) {
@@ -373,6 +376,30 @@ els.scanT.addEventListener("input", () => {
   syncAll();
 });
 
+// ── 三维 / 平面示意 切换 ──
+let has3D = false;
+
+function setView(on3d) {
+  const use3d = on3d && has3D;
+  $("instrument-3d").hidden = !use3d;
+  $("instrument").hidden = use3d;
+  Instrument3D.setVisible(use3d);
+  for (const [id, on] of [["view-3d", use3d], ["view-2d", !use3d]]) {
+    const b = $(id);
+    b.setAttribute("aria-pressed", String(on));
+    b.classList.toggle("is-on", on);
+  }
+}
+
+$("view-3d").addEventListener("click", () => {
+  if (!has3D) {
+    showHint("当前环境未创建 WebGL 上下文，装置图只能显示平面示意", true);
+    return;
+  }
+  setView(true);
+});
+$("view-2d").addEventListener("click", () => setView(false));
+
 // 注册 Service Worker：首次访问后把运行时与线表留在本地，之后弱网/断网也能打开。
 // 失败不阻塞使用（部分浏览器在非 HTTPS 或隐身模式下属正常拒绝）。
 if ("serviceWorker" in navigator) {
@@ -385,15 +412,23 @@ if ("serviceWorker" in navigator) {
 (async function main() {
   try {
     Instrument.mount($("instrument"));
+    try {
+      has3D = Instrument3D.init($("instrument-3d"));
+    } catch (e) {
+      has3D = false;                    // 无 WebGL：静默退回 SVG
+    }
+    setView(has3D);
     await loadManifest();
     // 先按表单默认值画一次装置图，避免等待首次计算时空着
     const p0 = buildParams();
-    Instrument.update({
+    const v0 = {
       species: p0.species, wn0: p0.wn0, span: p0.span, a: p0.a, L: p0.L,
       x: p0.x, T: p0.T, P: p0.P,
       nu: p0.wn0 - p0.span + 2 * p0.span * state.phase,
       phase: state.phase, peak2f: null,
-    });
+    };
+    Instrument.update(v0);
+    Instrument3D.update(v0);
     setStatus("busy", "加载运行时…");
     setProgress(3);
   } catch (err) {

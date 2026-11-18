@@ -6,6 +6,7 @@
 <title>SpectroLink Web · TDLAS-WMS 可视化仿真</title>
 <meta name="description" content="浏览器内运行的 TDLAS 波长调制（WMS）理论仿真：HITRAN2020 线表 + 免标定 2f/1f，全部计算在本地完成。">
 <link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/device3d.css">
 <link rel="stylesheet" href="vendor/uplot/uPlot.min.css">
 </head>
 <body>
@@ -88,10 +89,18 @@
           <button id="scan-play" class="btn-ghost" type="button">播放扫描</button>
           <input id="scan-t" class="range" type="range" min="0" max="1000" step="1" value="500"
                  aria-label="扫描相位">
+          <div class="seg" role="group" aria-label="装置图形态">
+            <button id="view-3d" class="seg-btn" type="button" aria-pressed="true">3D</button>
+            <button id="view-2d" class="seg-btn" type="button" aria-pressed="false">示意</button>
+          </div>
           <span class="tag">理论仿真</span>
         </div>
       </div>
-      <div class="instrument-wrap" id="instrument"></div>
+      <div class="instrument-wrap instrument-3d" id="instrument-3d"></div>
+      <div class="instrument-wrap" id="instrument" hidden></div>
+      <div class="hint instrument-hint">
+        拖拽旋转、滚轮缩放。光点为当前瞬时波数，光束亮度随调制相位起伏；池内为单程直射，与实际 L 一致。
+      </div>
     </article>
 
     <article class="card">
