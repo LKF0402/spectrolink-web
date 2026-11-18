@@ -1,0 +1,23 @@
+/* 三维装置容器与视图切换（配合 assets/js/scene3d.js） */
+.instrument-3d {
+  height: 392px;
+  background: radial-gradient(circle at 42% 36%, #ffffff 0%, #f5f6f5 58%, #e9edea 100%);
+}
+.instrument-3d canvas { width: 100%; height: 100%; display: block; }
+.instrument-hint { padding: 2px 8px 0; }
+
+.seg { display: inline-flex; border: 1px solid #c9c7c1; border-radius: 3px; overflow: hidden; }
+.seg-btn {
+  font: 500 11.5px/1 inherit;
+  padding: 5px 9px;
+  border: 0;
+  background: #fbfaf7;
+  color: #6b7280;
+  cursor: pointer;
+}
+.seg-btn.is-on { background: var(--accent); color: #fff; }
+.seg-btn + .seg-btn { border-left: 1px solid #c9c7c1; }
+
+@media (max-width: 900px) {
+  .instrument-3d { height: 300px; }
+}
