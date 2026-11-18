@@ -18,7 +18,7 @@
 
 - **物理内核零重写**：`py/tdlas_sim.py` 与 `py/spectrolink_core/` 由 `tools/bootstrap.py` 从上游仓库逐行复制，本站只新增 `py/web_api.py`（参数校验 + 序列化）。
 - **三端数值一致**：同一组参数（CH4 @ 6046.9636 cm⁻¹，100 ppm，50 cm，a = 0.08 cm⁻¹）在 CPython、pyodide headless、浏览器内分别得到 `peak_2f = 0.0026775647526798996 / 0.0026775647526798996 / 0.00268`，相对误差 ≤ 5.5×10⁻¹⁵。
-- **首屏体积约 23 MB**：Pyodide wasm 10 MB + numpy 3 MB + `hapi.py` 4 MB + 其余；运行时随站点分发（`vendor/`），不依赖第三方 CDN。
+- **首屏体积约 23 MB**：Pyodide wasm 10 MB + numpy 3 MB + `hapi.py` 4 MB + 其余；运行时随站点分发（`vendor/`），不依赖第三方 CDN。gzip/brotli 传输后约 **9.7 MB**（wasm 10→3.0 MB，`hapi.py` 3.9→1.2 MB）。
 - **线表按需加载**：两个预置谱区各约 37 KB，只在切到该谱区时才请求。
 
 ## 快速开始
@@ -29,7 +29,7 @@ python3 -m http.server 8765       # 浏览器对 file:// 下的 Worker 有限制
 # 打开 http://127.0.0.1:8765/index.html
 ```
 
-首次打开会下载约 23 MB 运行时，本地回环下约 10 s 完成初始化。
+首次打开会下载约 9.7 MB 传输量（解压后 23 MB），本地回环下约 10 s 完成初始化。
 
 只改前端、不想重新切线表时：
 
@@ -44,6 +44,7 @@ python3 tools/bootstrap.py --skip-tables
 | `index.html`、`assets/` | 页面、样式、UI 逻辑、Pyodide Worker——本站独有，需人工维护 |
 | `py/web_api.py` | 浏览器端计算入口：参数校验、异常归一化、数组序列化 |
 | `tools/` | `bootstrap.py`（一键准备）、`build_tables.py`（线表切片）、`fetch_vendor.py`（第三方运行时）、`verify_pyodide.mjs`（数值验证） |
+| `sw.js`、`_headers` | 离线缓存与长缓存头 |
 | `.github/workflows/pages.yml` | 构建 + 部署 Pages，并在部署前跑数值门禁 |
 
 | 不入库（生成物） | 生成者 |
@@ -53,13 +54,33 @@ python3 tools/bootstrap.py --skip-tables
 | `vendor/pyodide/`、`vendor/uplot/` | `fetch_vendor.py` 从 jsDelivr 取 |
 | `data/tables/`、`data/manifest.json` | `build_tables.py` 拉 HITRAN 后切片 |
 
-这样做的代价是首次准备需要联网，收益是：物理代码不与上游分叉、Git 历史里没有 17 MB 二进制、许可与版本关系清楚。
+这样做的代价是首次准备需要联网，收益是：物理代码不与上游分叉、Git 历史里没有 17 MB 二进制、许可与版本关系清晰。
 
 ## 部署
 
 推送到 `main` 即触发 GitHub Actions：装依赖 → `bootstrap.py` → 跑数值门禁（`peak_2f` 相对误差超 1×10⁻⁶ 即失败）→ 上传 Pages。
 
 首次部署需在仓库 **Settings → Pages → Source** 选择 **GitHub Actions**。
+
+### 免费托管选项
+
+| 方式 | 访问地址 | 成本 | 中国大陆可达性 |
+|---|---|---|---|
+| GitHub Pages | `lkf0402.github.io/spectrolink-web` | 免费 | 一般，偶发慢或不通 |
+| Cloudflare Pages | `spectrolink-web.pages.dev` | 免费 | 多数地区可用，优于 github.io |
+
+Cloudflare Pages 的零成本接法（不需要 API token）：CF 控制台 → Pages → Connect to Git → 选本仓库，构建设置填
+
+- Build command: `pip install "numpy>=1.24" "hitran-api>=1.3,<2" && python tools/bootstrap.py`
+- Build output directory: `/`
+
+根目录的 `_headers` 会被 Cloudflare Pages 识别，给 `vendor/` 打一年期强缓存。
+
+不需要备案；只有当托管在**中国大陆**的服务器上时才需要 ICP 备案，境外托管（GitHub、Cloudflare）不涉及。
+
+### 弱网与离线
+
+`sw.js` 会在首次访问后把运行时与已用过的线表写入 Cache Storage。之后断网、切网络、信号差都能直接打开，不再依赖远端。入口与 `data/manifest.json` 走网络优先，保证版本更新不会被旧缓存粘住。
 
 ## 增加谱区
 
@@ -78,7 +99,7 @@ node tools/verify_pyodide.mjs
 
 脚本把 `py/` 与 `data/` 写进 pyodide 虚拟文件系统，跑同一组参数与 CPython 基线逐项比对，任一项相对误差 ≥ 1×10⁻⁶ 即判失败。
 
-浏览器端有一处刻意保留的处理：装入新谱区线表后会把 `spectrolink_core.hitran._DB_READY` 置为 `False`，强制下一次取数重新 `db_begin`。原因是 HAPI 的表索引在首次 `db_begin` 时固定，运行期新写入的表不会被自动发现；不重置会误判“本地无表”并尝试联网，而浏览器里这是必然失败。
+浏览器端有一处刻意保留的处理：装入新谱区线表后会把 `spectrolink_core.hitran._DB_READY` 置为 `False`，强制下一次取数重新 `db_begin`。原因是 HAPI 的表索引在首次 `db_begin` 时固定，运行期新写入的表不会被自动发现；不重置会误判"本地无表"并尝试联网，而浏览器里这是必然失败。
 
 ## 已知边界
 
@@ -97,4 +118,4 @@ node tools/verify_pyodide.mjs
 
 ## English summary
 
-A fully client-side visualizer for SpectroLink's TDLAS-WMS engine. CPython 3.12 + numpy 2.0 run in the browser through Pyodide; the physics code is copied verbatim from upstream at build time, and HITRAN line lists are pre-sliced into ~37 KB per preset. Cross-implementation agreement verified at relative error ≤ 5.5×10⁻¹⁵ against CPython. No server, no data leaves the machine. Outputs are theoretical simulations.
+A fully client-side visualizer for SpectroLink's TDLAS-WMS engine. CPython 3.12 + numpy 2.0 run in the browser through Pyodide; the physics code is copied verbatim from upstream at build time, and HITRAN line lists are pre-sliced into ~37 KB per preset. Transfer size is ~9.7 MB gzipped. A Service Worker caches the runtime after first visit, so the site still opens offline. Cross-implementation agreement verified at relative error ≤ 5.5×10⁻¹⁵ against CPython. No server, no data leaves the machine. Outputs are theoretical simulations.
