@@ -233,3 +233,28 @@ html, body {
   .plot { height: 190px; }
   .brand-desc { display: none; }
 }
+
+/* ── 装置链路卡片（与信号同步） ── */
+.card-sub {
+  margin-left: 8px;
+  font: 400 11px/1 ui-monospace, Menlo, monospace;
+  color: #8a9096;
+  letter-spacing: 0;
+}
+.instrument-wrap { padding: 2px 6px 0; }
+.instrument-wrap svg { width: 100%; height: auto; display: block; }
+.instrument-wrap .svg-t { font: 600 11px ui-monospace, Menlo, monospace; fill: #2f353a; }
+.instrument-wrap .svg-s { font: 10px ui-monospace, Menlo, monospace; fill: #6b7280; }
+
+.btn-ghost {
+  font: 500 11.5px/1 inherit;
+  padding: 5px 9px;
+  border: 1px solid #c9c7c1;
+  border-radius: 3px;
+  background: #fbfaf7;
+  color: #2f353a;
+  cursor: pointer;
+}
+.btn-ghost:hover { border-color: #0f6d63; color: #0f6d63; }
+
+.range { width: 132px; accent-color: #0f6d63; }

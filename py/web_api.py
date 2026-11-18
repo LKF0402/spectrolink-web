@@ -20,6 +20,32 @@ import numpy as np
 
 import tdlas_sim as ts
 
+
+def _disable_network() -> None:
+    """封掉 HAPI 的下载入口。
+
+    浏览器里 `urllib` 由 pyodide 代理到 fetch，跨域请求 hitran.org 会真的被发出：
+    首次计算凭空多出数秒延迟，且把"全部计算在本地"这条前提打穿。
+    这里把 queryHITRAN 换成立即失败，让 `fetch_table` 回到它已有的归因分支——
+    要么命中预置切片，要么明确报「该窗口未预置」，不会静默走网络。
+    """
+    msg = ("离线环境：浏览器内不能访问 hitran.org，线表只能用构建期预置的切片"
+           "（见 data/manifest.json 的 presets）")
+
+    def _offline(*_args, **_kwargs):
+        raise RuntimeError(msg)
+
+    try:
+        import hapi as _h                      # py/vendor/hapi（单文件模块）
+    except Exception:
+        return
+    for target in (_h, getattr(_h, "hapi", None)):
+        if target is not None and hasattr(target, "queryHITRAN"):
+            setattr(target, "queryHITRAN", _offline)
+
+
+_disable_network()
+
 # 与 tools/build_tables.py 的 SPAN_MAX 一致：切片窗口只覆盖 ±2 cm⁻¹
 SPAN_MAX_CM = 2.0
 N_SCAN_LIMITS = (51, 801)
@@ -93,7 +119,7 @@ def simulate_wms(params: dict) -> dict:
             "table": meta_in.get("table"),
             # 2f 峰值位置与 2f/1f 免标定斜率，前端直接用于读数
             "peak_2f": float(np.max(r["S2f"])),
-            "peak_2f_wn": float(r["wn_scan"][int(np.argmax(r["S2f"])])),
+            "peak_2f_wn": float(r["wn_scan"][int(np.argmax(r["S2f"]))]),
             "peak_2f1f": float(np.max(r["S2f1f"])),
             "alpha_max": float(np.max(r["alpha"])),
         }
