@@ -2,6 +2,8 @@
 // 负责：读取 manifest → 组装参数 → 交给 Worker 计算 → 用 uPlot 绘图。
 // 物理计算一律不在此处发生，这里只做 I/O 与绘图。
 
+import { Instrument } from "./instrument.js";
+
 // uPlot 随站点分发（不依赖第三方 CDN）
 const UPLOT_URL = new URL("../../vendor/uplot/uPlot.esm.js", import.meta.url).href;
 
@@ -16,9 +18,11 @@ const els = {
   rPeak2f: $("r-peak2f"), rPeak2fWn: $("r-peak2f-wn"), rPeak2f1f: $("r-peak2f1f"),
   rAlpha: $("r-alpha"), rLines: $("r-lines"), rElapsed: $("r-elapsed"),
   provenance: $("provenance"),
+  scanPlay: $("scan-play"), scanT: $("scan-t"),
 };
 
-const state = { manifest: null, ready: false, busy: false, UPlot: null, plots: {} };
+const state = { manifest: null, ready: false, busy: false, UPlot: null, plots: {},
+                phase: 0.5, playing: false, raf: 0, lastTs: 0 };
 
 // ───────────────────────── 格式化 ─────────────────────────
 const sci = (v, digits = 2) => {
@@ -282,6 +286,63 @@ async function render(res, elapsed) {
   await draw("calib", "plot-calib", ws, [
     { label: "2f/1f", data: c.S2f1f, color: COLORS.calib, width: 1.8, axisLabel: "2f/1f (a.u.)" },
   ]);
+
+  syncAll();
+}
+
+// ───────────────────── 装置 ↔ 信号同步 ─────────────────────
+// 扫描相位 phase ∈ [0,1] 映射为瞬时波数 ν = wn0 - span + 2·span·phase。
+// 装置图上的光点位置与三张图的游标都由这一个 ν 驱动，不存在第二套时间轴。
+function currentNu() {
+  const p = currentPreset();
+  const span = Number(els.span.value);
+  return p.wn0 - span + 2 * span * state.phase;
+}
+
+function syncAll() {
+  const res = state.lastResult;
+  if (!res) return;
+  const nu = currentNu();
+  const preset = currentPreset();     // 谱区切换后立刻以新谱区为准，避免沿用上一次的 wn0
+  const p = buildParams();            // 装置图反映"当前设定"，曲线反映"最近一次计算"
+  Instrument.update({
+    species: preset.species,
+    wn0: preset.wn0,
+    span: p.span,
+    a: p.a,
+    L: p.L,
+    x: p.x,
+    T: p.T,
+    P: p.P,
+    nu,
+    phase: state.phase,
+    peak2f: res.meta.peak_2f,
+  });
+
+  // 注意：uPlot 的 setCursor 只接受像素坐标，波数→像素必须走 valToPos
+  for (const key of ["alpha", "harmonics", "calib"]) {
+    const plot = state.plots[key];
+    if (!plot) continue;
+    plot.setCursor({ left: plot.valToPos(nu, "x"), top: 0 });
+  }
+}
+
+function tick(ts) {
+  if (!state.playing) return;
+  const dt = state.lastTs ? (ts - state.lastTs) / 1000 : 0.016;
+  state.lastTs = ts;
+  state.phase = (state.phase + dt / 6) % 1;   // 6 s 一个扫描周期
+  els.scanT.value = String(Math.round(state.phase * 1000));
+  syncAll();
+  state.raf = requestAnimationFrame(tick);
+}
+
+function togglePlay() {
+  state.playing = !state.playing;
+  state.lastTs = 0;
+  els.scanPlay.textContent = state.playing ? "暂停扫描" : "播放扫描";
+  if (state.playing) state.raf = requestAnimationFrame(tick);
+  else cancelAnimationFrame(state.raf);
 }
 
 // 窗口尺寸变化时按新宽度重绘（uPlot 不做自动布局）
@@ -305,6 +366,13 @@ $("norm").addEventListener("change", () => {
 });
 els.run.addEventListener("click", runSim);
 
+els.scanPlay.addEventListener("click", togglePlay);
+els.scanT.addEventListener("input", () => {
+  if (state.playing) togglePlay();
+  state.phase = Number(els.scanT.value) / 1000;
+  syncAll();
+});
+
 // 注册 Service Worker：首次访问后把运行时与线表留在本地，之后弱网/断网也能打开。
 // 失败不阻塞使用（部分浏览器在非 HTTPS 或隐身模式下属正常拒绝）。
 if ("serviceWorker" in navigator) {
@@ -316,7 +384,16 @@ if ("serviceWorker" in navigator) {
 // ───────────────────────── 启动 ─────────────────────────
 (async function main() {
   try {
+    Instrument.mount($("instrument"));
     await loadManifest();
+    // 先按表单默认值画一次装置图，避免等待首次计算时空着
+    const p0 = buildParams();
+    Instrument.update({
+      species: p0.species, wn0: p0.wn0, span: p0.span, a: p0.a, L: p0.L,
+      x: p0.x, T: p0.T, P: p0.P,
+      nu: p0.wn0 - p0.span + 2 * p0.span * state.phase,
+      phase: state.phase, peak2f: null,
+    });
     setStatus("busy", "加载运行时…");
     setProgress(3);
   } catch (err) {

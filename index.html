@@ -83,6 +83,19 @@
   <section class="plots">
     <article class="card">
       <div class="card-head">
+        <h3>装置链路与信号同步<span class="card-sub">TDLAS-WMS · 透射式</span></h3>
+        <div class="card-tools">
+          <button id="scan-play" class="btn-ghost" type="button">播放扫描</button>
+          <input id="scan-t" class="range" type="range" min="0" max="1000" step="1" value="500"
+                 aria-label="扫描相位">
+          <span class="tag">理论仿真</span>
+        </div>
+      </div>
+      <div class="instrument-wrap" id="instrument"></div>
+    </article>
+
+    <article class="card">
+      <div class="card-head">
         <h3>吸收系数 α(ν)</h3>
         <span class="tag">理论仿真</span>
       </div>
