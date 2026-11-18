@@ -134,7 +134,7 @@ node tools/verify_pyodide.mjs
 
 线表数据来自 HITRAN2020：
 
-> I. E. Gordon et al., *The HITRAN2020 molecular spectroscopic database*, J. Quant. Spec тrosc. Radiat. Transfer **277**, 107949 (2022). doi:10.1016/j.jqsrt.2021.107949
+> I. E. Gordon et al., *The HITRAN2020 molecular spectroscopic database*, J. Quant. Spectrosc. Radiat. Transfer **277**, 107949 (2022). doi:10.1016/j.jqsrt.2021.107949
 
 ## English summary
 
