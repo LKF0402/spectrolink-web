@@ -1,0 +1,65 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build dependencies
+        run: pip install "numpy>=1.24" "hitran-api>=1.3,<2"
+
+      - name: Bootstrap (upstream kernel + runtimes + line tables)
+        run: python tools/bootstrap.py
+
+      - name: Verify browser kernel against CPython baseline
+        run: |
+          python - <<'PY'
+          import os, sys
+          sys.path.insert(0, "py"); sys.path.insert(0, "py/vendor")
+          os.environ["SPECTROLINK_DATA_DIR"] = "data/tables"
+          import web_api
+          r = web_api.simulate_wms({"species": "CH4", "wn0": 6046.9636, "span": 0.6, "T": 296,
+                                    "P": 1.01325, "x": 1e-4, "L": 50, "a": 0.08,
+                                    "n_scan": 201, "n_mod": 96})
+          assert r["ok"], r
+          peak = r["meta"]["peak_2f"]
+          baseline = 0.0026775647526798996
+          rel = abs(peak - baseline) / baseline
+          print(f"peak_2f={peak} rel_err={rel:.2e}")
+          assert rel < 1e-6, "数值相对误差超限，内核或线表可能已漂移"
+          PY
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

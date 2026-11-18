@@ -1,0 +1,11 @@
+vendor/
+py/tdlas_sim.py
+py/spectrolink_core/
+py/vendor/
+data/tables/
+data/manifest.json
+LICENSE-GPL-3.0.txt
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store

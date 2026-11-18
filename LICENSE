@@ -1,0 +1,33 @@
+SpectroLink Web
+Copyright (C) 2026 SpectroLink Web contributors
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program.  If not, see <https://www.gnu.org/licenses/>.
+
+SPDX-License-Identifier: GPL-3.0-or-later
+
+GPL-3.0 全文由 tools/bootstrap.py 从上游仓库复制为 LICENSE-GPL-3.0.txt
+（该文件为生成物，不入库；仓库历史里保留本声明以保证许可证可识别）。
+
+--------------------------------------------------------------------------------
+第三方组件
+--------------------------------------------------------------------------------
+· py/tdlas_sim.py, py/spectrolink_core/  —— 来自 SpectroLink（GPL-3.0），
+  由 tools/bootstrap.py 从上游逐行复制，未作修改。
+· py/vendor/hapi/  —— HAPI (hitran-api)，MIT License，Copyright (c) HITRAN team.
+· vendor/uplot/    —— uPlot，MIT License，Copyright (c) Leon Sorokin.
+· vendor/pyodide/  —— Pyodide，MPL-2.0。
+
+分发的 HITRAN 线表数据请按官方要求引用：
+I. E. Gordon et al., The HITRAN2020 molecular spectroscopic database,
+J. Quant. Spectrosc. Radiat. Transfer 277, 107949 (2022).
+doi:10.1016/j.jqsrt.2021.107949
