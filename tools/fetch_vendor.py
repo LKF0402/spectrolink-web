@@ -10,6 +10,7 @@
 产物（均被 .gitignore 忽略，本地与 CI 各自拉取）：
   vendor/pyodide/    Pyodide 运行时（wasm + stdlib + lock + numpy wheel）
   vendor/uplot/      uPlot 绘图表与样式
+  vendor/three/      three.js（三维装置图，ESM 单文件）
   py/vendor/hapi/    HAPI 1.x（hitran-api 发行名，import 名 hapi）
 
 用法：
@@ -19,6 +20,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import io
+import shutil
 import sys
 import tempfile
 import urllib.request
@@ -43,6 +47,11 @@ UPLOT_VERSION = "1.6.32"
 UPLOT_FILES = {
     "uPlot.esm.js": f"https://cdn.jsdelivr.net/npm/uplot@{UPLOT_VERSION}/dist/uPlot.esm.js",
     "uPlot.min.css": f"https://cdn.jsdelivr.net/npm/uplot@{UPLOT_VERSION}/dist/uPlot.min.css",
+}
+
+THREE_VERSION = "0.160.0"
+THREE_FILES = {
+    "three.module.js": f"https://cdn.jsdelivr.net/npm/three@{THREE_VERSION}/build/three.module.js",
 }
 
 HITRAN_API_VERSION = "1.3.0.0"
@@ -76,6 +85,16 @@ def fetch_uplot(force: bool) -> None:
         _download(url, dest)
 
 
+def fetch_three(force: bool) -> None:
+    out = ROOT / "vendor" / "three"
+    for name, url in THREE_FILES.items():
+        dest = out / name
+        if dest.exists() and not force:
+            print(f"  = {dest.relative_to(ROOT)}")
+            continue
+        _download(url, dest)
+
+
 def fetch_hapi(force: bool) -> None:
     out = ROOT / "py" / "vendor" / "hapi"
     if (out / "hapi.py").exists() and not force:
@@ -84,6 +103,7 @@ def fetch_hapi(force: bool) -> None:
     # 从 PyPI 取 wheel（纯 Python，无编译），只解出 hapi 包内两个文件
     with tempfile.TemporaryDirectory() as td:
         tmp = Path(td)
+        # PyPI 的 source 路径不稳定，改用 pip download 由解析器处理
         import subprocess
         subprocess.run(
             [sys.executable, "-m", "pip", "download", "--no-deps", "--dest", str(tmp),
@@ -123,6 +143,8 @@ def main() -> int:
     fetch_pyodide(args.force)
     print(f"[uplot {UPLOT_VERSION}]")
     fetch_uplot(args.force)
+    print(f"[three {THREE_VERSION}]")
+    fetch_three(args.force)
     print(f"[hapi {HITRAN_API_VERSION}]")
     fetch_hapi(args.force)
 
