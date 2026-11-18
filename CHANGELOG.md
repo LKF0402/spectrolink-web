@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## v0.2.0 · 2026-11-18
+
+把装置与信号放进同一屏，并补齐离线与部署通道。
+
+### 新增
+
+- 装置链路图（TDLAS-WMS 透射式，内联 SVG）：激光器 → 准直 → 光程池 → 探测器 → 前放 → 锁相，标注随参数实时更新（中心波长、扫描区间、调制波形、光程、浓度、温压、2f 峰值）。
+- 扫描相位联动：滑块或播放按钮驱动瞬时波数 ν = wn0 − span + 2·span·phase，装置上光点沿池移动、调制项起伏，三张谱图的游标同步走位。
+- Service Worker 运行时缓存：首次访问后断网、弱网仍可打开；入口与 `manifest.json` 走网络优先，避免被旧缓存粘住。
+- `_headers` 长缓存头：`vendor/` 一年期 immutable（Cloudflare Pages 生效，GitHub Pages 忽略）。
+- Cloudflare Pages 部署通道 `.github/workflows/cloudflare.yml`：GitHub runner 构建 + 同一套数值门禁 + rsync 到 `dist/` 后上传。
+
+### 问题修复
+
+- 浏览器内核会尝试跨域访问 hitran.org，首次计算凭空多出数秒延迟，且与"全部计算在本地"的前提矛盾。在 `py/web_api.py` 入口封掉 HAPI 的 `queryHITRAN`：命中预置切片则正常出图，未预置则明确报错，不再静默走网络。
+
+### 说明
+
+- 装置图为通用教学示意，未绑定具体器件型号与尺寸。
+- LITES / QEPAS 需先把对应内核移植进浏览器，本期未接入。
+
 ## v0.1.0 · 2026-11-18
 
 首个可用版本：把 SpectroLink 的 TDLAS-WMS 内核搬进浏览器。
