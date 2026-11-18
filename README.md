@@ -45,7 +45,8 @@ python3 tools/bootstrap.py --skip-tables
 | `py/web_api.py` | 浏览器端计算入口：参数校验、异常归一化、数组序列化 |
 | `tools/` | `bootstrap.py`（一键准备）、`build_tables.py`（线表切片）、`fetch_vendor.py`（第三方运行时）、`verify_pyodide.mjs`（数值验证） |
 | `sw.js`、`_headers` | 离线缓存与长缓存头 |
-| `.github/workflows/pages.yml` | 构建 + 部署 Pages，并在部署前跑数值门禁 |
+| `.github/workflows/pages.yml` | 构建 + 部署 GitHub Pages，并在部署前跑数值门禁 |
+| `.github/workflows/cloudflare.yml` | 构建 + 部署 Cloudflare Pages（同一套门禁） |
 
 | 不入库（生成物） | 生成者 |
 |---|---|
@@ -69,12 +70,31 @@ python3 tools/bootstrap.py --skip-tables
 | GitHub Pages | `lkf0402.github.io/spectrolink-web` | 免费 | 一般，偶发慢或不通 |
 | Cloudflare Pages | `spectrolink-web.pages.dev` | 免费 | 多数地区可用，优于 github.io |
 
-Cloudflare Pages 的零成本接法（不需要 API token）：CF 控制台 → Pages → Connect to Git → 选本仓库，构建设置填
+Cloudflare Pages 有两种接法，都免费。
+
+**方式 A · GitHub Actions 构建后直传（推荐）**
+
+`.github/workflows/cloudflare.yml` 在 GitHub runner 上完成 bootstrap 与数值门禁，再把产物推到 CF Pages。相比让 CF 自己构建，这条路复用与 GitHub Pages 完全相同的构建环境，不受 CF 构建镜像的 Python 版本影响。
+
+1. Cloudflare 控制台 → My Profile → API Tokens → Create Token，用 **Edit Cloudflare Workers** 模板（或自定义：`Account:Read` + `Pages:Edit`）；
+2. Account ID 在 CF 控制台右侧栏（或浏览器地址栏里 `dash.cloudflare.com/<account_id>`）复制；
+3. 仓库 Settings → Secrets and variables → Actions → New repository secret，加两条：`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`；
+4. 仓库 Actions → **Deploy to Cloudflare Pages** → Run workflow。
+
+首次运行会在 CF 侧自动创建 `spectrolink-web` 项目，地址 `https://spectrolink-web.pages.dev`。若报 project not found，先在 CF 控制台 Pages 建一个同名空项目（Direct Upload 模式）再跑。
+
+workflow 先把产物 rsync 到 `dist/` 再上传：wrangler 会读 `.gitignore` 决定上传范围，而 `vendor/`、`data/` 恰在 `.gitignore` 中（它们是构建生成物），直接在仓库根上传会漏掉运行时。
+
+**方式 B · CF 自己构建（不用 token）**
+
+CF 控制台 → Pages → Connect to Git → 选本仓库，构建设置填
 
 - Build command: `pip install "numpy>=1.24" "hitran-api>=1.3,<2" && python tools/bootstrap.py`
 - Build output directory: `/`
 
-根目录的 `_headers` 会被 Cloudflare Pages 识别，给 `vendor/` 打一年期强缓存。
+代价是构建环境由 CF 提供，Python 版本与可用的 pip 包需以 CF 构建镜像为准。
+
+两种方式下，根目录的 `_headers` 都会被 Cloudflare Pages 识别，给 `vendor/` 打一年期强缓存。
 
 不需要备案；只有当托管在**中国大陆**的服务器上时才需要 ICP 备案，境外托管（GitHub、Cloudflare）不涉及。
 
@@ -114,7 +134,7 @@ node tools/verify_pyodide.mjs
 
 线表数据来自 HITRAN2020：
 
-> I. E. Gordon et al., *The HITRAN2020 molecular spectroscopic database*, J. Quant. Spectrosc. Radiat. Transfer **277**, 107949 (2022). doi:10.1016/j.jqsrt.2021.107949
+> I. E. Gordon et al., *The HITRAN2020 molecular spectroscopic database*, J. Quant. Spec тrosc. Radiat. Transfer **277**, 107949 (2022). doi:10.1016/j.jqsrt.2021.107949
 
 ## English summary
 

@@ -1,0 +1,72 @@
+name: Deploy to Cloudflare Pages
+
+on:
+  workflow_dispatch:
+  # 配好 secrets 后可启用下面注释，让每次 push 自动部署
+  # push:
+  #   branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cf-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build dependencies
+        run: pip install "numpy>=1.24" "hitran-api>=1.3,<2"
+
+      - name: Bootstrap (upstream kernel + runtimes + line tables)
+        run: python tools/bootstrap.py
+
+      - name: Verify browser kernel against CPython baseline
+        run: |
+          python - <<'PY'
+          import json, sys
+          sys.path.insert(0, "py"); sys.path.insert(0, "py/vendor")
+          import os
+          os.environ["SPECTROLINK_DATA_DIR"] = "data/tables"
+          import web_api
+          r = web_api.simulate_wms({"species": "CH4", "wn0": 6046.9636, "span": 0.6, "T": 296,
+                                    "P": 1.01325, "x": 1e-4, "L": 50, "a": 0.08,
+                                    "n_scan": 201, "n_mod": 96})
+          assert r["ok"], r
+          peak = r["meta"]["peak_2f"]
+          baseline = 0.0026775647526798996
+          rel = abs(peak - baseline) / baseline
+          print(f"peak_2f={peak} rel_err={rel:.2e}")
+          assert rel < 1e-6, "数值相对误差超限，内核或线表可能已漂移"
+          PY
+
+      # 单独整理一份发布目录：wrangler 会读 .gitignore 过滤上传内容，
+      # 而 vendor/ 与 data/ 恰好在 .gitignore 里（它们是构建生成物），
+      # 直接在仓库根上传会漏掉运行时。dist/ 内不带 .gitignore，上传完整。
+      - name: Stage deploy directory
+        run: |
+          rm -rf dist && mkdir -p dist
+          rsync -a \
+            --exclude '.git' --exclude '.github' --exclude 'dist' \
+            --exclude '.gitignore' --exclude 'tools' --exclude 'node_modules' \
+            --exclude '__pycache__' --exclude 'LICENSE-GPL-3.0.txt' \
+            ./ dist/
+          echo "--- dist ---"
+          du -sh dist
+          ls dist
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: dist
+          command: pages deploy . --project-name=spectrolink-web --branch=main --commit-dirty=true
