@@ -305,6 +305,14 @@ $("norm").addEventListener("change", () => {
 });
 els.run.addEventListener("click", runSim);
 
+// 注册 Service Worker：首次访问后把运行时与线表留在本地，之后弱网/断网也能打开。
+// 失败不阻塞使用（部分浏览器在非 HTTPS 或隐身模式下属正常拒绝）。
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker
+    .register(new URL("../../sw.js", import.meta.url).href)
+    .catch(() => {});
+}
+
 // ───────────────────────── 启动 ─────────────────────────
 (async function main() {
   try {
