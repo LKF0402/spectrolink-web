@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SpectroLink Web · TDLAS-WMS 可视化仿真</title>
+<meta name="description" content="浏览器内运行的 TDLAS 波长调制（WMS）理论仿真：HITRAN2020 线表 + 免标定 2f/1f，全部计算在本地完成。">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="vendor/uplot/uPlot.min.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">SpectroLink<span class="brand-sub">Web</span></span>
+    <span class="brand-desc">TDLAS 波长调制（WMS）理论仿真 · 全部计算在浏览器本地完成</span>
+  </div>
+  <div class="status" id="status">
+    <span class="dot" id="status-dot"></span>
+    <span id="status-text">初始化中…</span>
+  </div>
+</header>
+
+<div class="progress" id="progress-wrap">
+  <div class="progress-bar" id="progress-bar"></div>
+</div>
+
+<main class="layout">
+
+  <aside class="panel">
+    <section class="group">
+      <h2>谱区</h2>
+      <label class="field">
+        <span>预置谱区</span>
+        <select id="preset"></select>
+      </label>
+      <div class="hint" id="preset-meta">—</div>
+    </section>
+
+    <section class="group">
+      <h2>工况</h2>
+      <div class="row2">
+        <label class="field"><span>温度 T (K)</span><input id="T" type="number" value="296" step="1" min="100" max="1000"></label>
+        <label class="field"><span>压力 P (atm)</span><input id="P" type="number" value="1.01325" step="0.01" min="0.001" max="20"></label>
+      </div>
+      <div class="row2">
+        <label class="field"><span>浓度 x (ppm)</span><input id="ppm" type="number" value="100" step="1" min="0.001" max="500000"></label>
+        <label class="field"><span>光程 L (cm)</span><input id="L" type="number" value="50" step="1" min="0.01"></label>
+      </div>
+    </section>
+
+    <section class="group">
+      <h2>扫描与调制</h2>
+      <div class="row2">
+        <label class="field"><span>扫描半宽 (cm⁻¹)</span><input id="span" type="number" value="0.6" step="0.05" min="0.01" max="2"></label>
+        <label class="field"><span>调制深度 a (cm⁻¹)</span><input id="a" type="number" value="0.08" step="0.01" min="0.0001" max="2"></label>
+      </div>
+      <details class="advanced">
+        <summary>采样参数</summary>
+        <div class="row2">
+          <label class="field"><span>扫描点数 n_scan</span><input id="n_scan" type="number" value="201" step="10" min="51" max="801"></label>
+          <label class="field"><span>每周期采样 n_mod</span><input id="n_mod" type="number" value="96" step="8" min="16" max="256"></label>
+        </div>
+      </details>
+      <button id="run" class="btn-primary" disabled>运行仿真</button>
+      <div class="hint" id="run-hint">首次加载需下载约 23 MB 运行时</div>
+    </section>
+
+    <section class="group">
+      <h2>读数</h2>
+      <dl class="readout" id="readout">
+        <dt>2f 峰值</dt><dd id="r-peak2f">—</dd>
+        <dt>2f 峰位置</dt><dd id="r-peak2f-wn">—</dd>
+        <dt>2f/1f 峰值</dt><dd id="r-peak2f1f">—</dd>
+        <dt>α 峰值</dt><dd id="r-alpha">—</dd>
+        <dt>窗内谱线</dt><dd id="r-lines">—</dd>
+        <dt>计算耗时</dt><dd id="r-elapsed">—</dd>
+      </dl>
+      <div class="provenance" id="provenance">—</div>
+    </section>
+  </aside>
+
+  <section class="plots">
+    <article class="card">
+      <div class="card-head">
+        <h3>吸收系数 α(ν)</h3>
+        <span class="tag">理论仿真</span>
+      </div>
+      <div class="plot" id="plot-alpha"></div>
+    </article>
+
+    <article class="card">
+      <div class="card-head">
+        <h3>WMS 谐波幅度 R<sub>1f</sub> / R<sub>2f</sub> / R<sub>4f</sub></h3>
+        <div class="card-tools">
+          <label class="check"><input type="checkbox" id="norm" checked> 归一化</label>
+          <span class="tag">理论仿真</span>
+        </div>
+      </div>
+      <div class="plot" id="plot-harmonics"></div>
+    </article>
+
+    <article class="card">
+      <div class="card-head">
+        <h3>免标定 2f/1f</h3>
+        <span class="tag">理论仿真</span>
+      </div>
+      <div class="plot" id="plot-calib"></div>
+    </article>
+
+    <p class="footnote">
+      全部数值由浏览器内的 CPython + numpy 现算，物理内核与
+      <a href="https://github.com/LKF0402/spectrolink" target="_blank" rel="noopener">SpectroLink</a>
+      仓库逐行一致；线表为构建期切片的 HITRAN2020 数据。输出为理论仿真，不代表实验测量。
+    </p>
+  </section>
+
+</main>
+
+<script type="module" src="assets/js/app.js"></script>
+</body>
+</html>
