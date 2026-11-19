@@ -27,17 +27,6 @@ jobs:
       - name: Install build dependency
         run: |
           python -m pip install --disable-pip-version-check --no-input "numpy>=1.24" > pip.log 2>&1 || { echo "::error::pip failed :: $(tail -3 pip.log | tr '\n' ' ' | cut -c1-300)"; exit 1; }
-          python -V
-
-      # 诊断 HITRAN 可达性：结果写进 annotation，匿名也能读
-      - name: Diagnose HITRAN reachability
-        run: |
-          set +e
-          for u in https://hitran.org/lbl/ http://hitran.org/lbl/ https://hitran.org; do
-            code=$(curl -s -o /dev/null -m 25 -w "%{http_code}" "$u")
-            echo "$u -> $code"
-            echo "::warning::$u -> HTTP $code"
-          done
 
       - name: Bootstrap (upstream kernel + runtimes + line tables)
         run: |
@@ -45,7 +34,19 @@ jobs:
           python tools/bootstrap.py > boot.log 2>&1
           st=$?
           if [ $st -ne 0 ]; then
-            echo "::error::bootstrap failed ($st) :: $(tail -18 boot.log | tr '\n' ' | ' | cut -c1-1500)"
+            python - <<'PY'
+            import pathlib, re, sys
+            txt = pathlib.Path("boot.log").read_text(errors="ignore")
+            i = txt.find("[线表切片]")
+            seg = txt[i:] if i >= 0 else txt[-3000:]
+            # 只留关键行：异常类型、最后一行、以及 HTTP/URL/错误关键词
+            lines = [l for l in seg.splitlines() if l.strip()]
+            keep = [l for l in lines if any(k in l for k in (
+                "Error", "error", "Exception", "不能", "无法", "Cannot", "HTTP", "403", "404",
+                "Timeout", "timed out", "SSL", "urlopen", "hapi", "HAPI", "TIPS", "lbl", "api"))]
+            body = " | ".join(keep[-12:]) or " | ".join(lines[-8:])
+            print("::error::build_tables :: " + body[:1400])
+            PY
             exit $st
           fi
           tail -6 boot.log
@@ -68,7 +69,6 @@ jobs:
           assert rel < 1e-6, "数值相对误差超限，内核或线表可能已漂移"
           PY
 
-      # enablement: true —— Pages 尚未启用时由工作流自行创建站点
       - uses: actions/configure-pages@v5
         with:
           enablement: true
