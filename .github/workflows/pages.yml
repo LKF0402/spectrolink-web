@@ -24,29 +24,35 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Env probe
+        run: |
+          echo "## 00 环境" >> $GITHUB_STEP_SUMMARY
+          { python -V; python -m pip -V; } 2>&1 | sed 's/^/    /' >> $GITHUB_STEP_SUMMARY
+
       - name: Install build dependency
         run: |
-          python -m pip install --disable-pip-version-check --no-input "numpy>=1.24"
-          echo "- 01 pip 完成" >> $GITHUB_STEP_SUMMARY
+          echo "## 01 pip" >> $GITHUB_STEP_SUMMARY
+          python -m pip install --disable-pip-version-check "numpy>=1.24" 2>&1 | tail -40 | sed 's/^/    /' >> $GITHUB_STEP_SUMMARY
 
       - name: Restore line tables
         run: |
-          python tools/restore_tables.py
-          echo "- 02 线表还原完成" >> $GITHUB_STEP_SUMMARY
+          echo "## 02 线表还原" >> $GITHUB_STEP_SUMMARY
+          python tools/restore_tables.py 2>&1 | sed 's/^/    /' >> $GITHUB_STEP_SUMMARY
 
       - name: Bootstrap
         run: |
-          python tools/bootstrap.py --skip-tables
-          echo "- 03 bootstrap 完成" >> $GITHUB_STEP_SUMMARY
+          echo "## 03 bootstrap" >> $GITHUB_STEP_SUMMARY
+          python tools/bootstrap.py --skip-tables 2>&1 | tail -40 | sed 's/^/    /' >> $GITHUB_STEP_SUMMARY
 
       - name: Check tables
         run: |
-          python tools/build_tables.py --check
-          echo "- 04 线表校验完成" >> $GITHUB_STEP_SUMMARY
+          echo "## 04 线表校验" >> $GITHUB_STEP_SUMMARY
+          python tools/build_tables.py --check 2>&1 | sed 's/^/    /' >> $GITHUB_STEP_SUMMARY
 
       - name: Verify kernel baseline
         run: |
-          python - <<'PY'
+          echo "## 05 数值校验" >> $GITHUB_STEP_SUMMARY
+          python - <<'PY' 2>&1 | sed 's/^/    /' >> $GITHUB_STEP_SUMMARY
           import os, sys
           sys.path.insert(0, "py")
           sys.path.insert(0, "py/vendor")
@@ -62,7 +68,6 @@ jobs:
           print(f"peak_2f={peak} rel_err={rel:.2e}")
           assert rel < 1e-6, "数值相对误差超限"
           PY
-          echo "- 05 数值校验完成" >> $GITHUB_STEP_SUMMARY
 
       - uses: actions/configure-pages@v5
         with:
