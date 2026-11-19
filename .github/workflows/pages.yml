@@ -24,18 +24,20 @@ jobs:
         with:
           python-version: "3.12"
 
-      # 失败原因写进 annotation（匿名可读），无需登录才能看日志
       - name: Install build dependency
         run: |
-          set +e
-          python -m pip install --disable-pip-version-check --no-input "numpy>=1.24" > pip.log 2>&1
-          st=$?
-          if [ $st -ne 0 ]; then
-            echo "::error::pip install failed ($st) :: $(tail -3 pip.log | tr '\n' ' ' | cut -c1-300)"
-            exit $st
-          fi
+          python -m pip install --disable-pip-version-check --no-input "numpy>=1.24" > pip.log 2>&1 || { echo "::error::pip failed :: $(tail -3 pip.log | tr '\n' ' ' | cut -c1-300)"; exit 1; }
           python -V
-          python -c "import numpy; print('numpy', numpy.__version__)"
+
+      # 诊断 HITRAN 可达性：结果写进 annotation，匿名也能读
+      - name: Diagnose HITRAN reachability
+        run: |
+          set +e
+          for u in https://hitran.org/lbl/ http://hitran.org/lbl/ https://hitran.org; do
+            code=$(curl -s -o /dev/null -m 25 -w "%{http_code}" "$u")
+            echo "$u -> $code"
+            echo "::warning::$u -> HTTP $code"
+          done
 
       - name: Bootstrap (upstream kernel + runtimes + line tables)
         run: |
@@ -43,7 +45,7 @@ jobs:
           python tools/bootstrap.py > boot.log 2>&1
           st=$?
           if [ $st -ne 0 ]; then
-            echo "::error::bootstrap failed ($st) :: $(tail -4 boot.log | tr '\n' ' | ' | cut -c1-500)"
+            echo "::error::bootstrap failed ($st) :: $(tail -18 boot.log | tr '\n' ' | ' | cut -c1-1500)"
             exit $st
           fi
           tail -6 boot.log
