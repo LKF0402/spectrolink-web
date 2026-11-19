@@ -48,7 +48,10 @@ jobs:
           assert rel < 1e-6, "数值相对误差超限，内核或线表可能已漂移"
           PY
 
+      # enablement: true —— Pages 尚未启用时由工作流自行创建站点，避免依赖手动设置
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
