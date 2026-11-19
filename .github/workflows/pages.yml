@@ -25,18 +25,26 @@ jobs:
           python-version: "3.12"
 
       - name: Install build dependency
-        run: python -m pip install --disable-pip-version-check --no-input "numpy>=1.24"
+        run: |
+          python -m pip install --disable-pip-version-check --no-input "numpy>=1.24"
+          echo "- 01 pip 完成" >> $GITHUB_STEP_SUMMARY
 
-      - name: Restore line tables from in-repo slices
-        run: python tools/restore_tables.py
+      - name: Restore line tables
+        run: |
+          python tools/restore_tables.py
+          echo "- 02 线表还原完成" >> $GITHUB_STEP_SUMMARY
 
-      - name: Bootstrap (upstream kernel + runtimes, tables already restored)
-        run: python tools/bootstrap.py --skip-tables
+      - name: Bootstrap
+        run: |
+          python tools/bootstrap.py --skip-tables
+          echo "- 03 bootstrap 完成" >> $GITHUB_STEP_SUMMARY
 
-      - name: Verify line tables against manifest
-        run: python tools/build_tables.py --check
+      - name: Check tables
+        run: |
+          python tools/build_tables.py --check
+          echo "- 04 线表校验完成" >> $GITHUB_STEP_SUMMARY
 
-      - name: Verify kernel against CPython baseline
+      - name: Verify kernel baseline
         run: |
           python - <<'PY'
           import os, sys
@@ -52,8 +60,9 @@ jobs:
           baseline = 0.0026775647526798996
           rel = abs(peak - baseline) / baseline
           print(f"peak_2f={peak} rel_err={rel:.2e}")
-          assert rel < 1e-6, "数值相对误差超限，内核或线表可能已漂移"
+          assert rel < 1e-6, "数值相对误差超限"
           PY
+          echo "- 05 数值校验完成" >> $GITHUB_STEP_SUMMARY
 
       - uses: actions/configure-pages@v5
         with:
