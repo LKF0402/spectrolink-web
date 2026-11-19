@@ -22,8 +22,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import io
+import json
 import shutil
 import sys
+import tarfile
 import tempfile
 import urllib.request
 import zipfile
@@ -100,32 +102,30 @@ def fetch_hapi(force: bool) -> None:
     if (out / "hapi.py").exists() and not force:
         print("  = py/vendor/hapi/hapi.py")
         return
-    # 从 PyPI 取 wheel（纯 Python，无编译），只解出 hapi 包内两个文件
-    with tempfile.TemporaryDirectory() as td:
-        tmp = Path(td)
-        # PyPI 的 source 路径不稳定，改用 pip download 由解析器处理
-        import subprocess
-        subprocess.run(
-            [sys.executable, "-m", "pip", "download", "--no-deps", "--dest", str(tmp),
-             f"hitran-api=={HITRAN_API_VERSION}"],
-            check=True, stdout=subprocess.DEVNULL,
-        )
-        artifacts = list(tmp.iterdir())
-        if not artifacts:
-            raise SystemExit("pip download 未产出文件")
-        src = artifacts[0]
-        if src.suffix == ".whl":
-            with zipfile.ZipFile(src) as zf:
-                for member in ("hapi/hapi.py", "hapi/__init__.py"):
-                    data = zf.read(member)
-                    (out / Path(member).name).write_bytes(data)
-        else:  # sdist
-            import tarfile
-            with tarfile.open(src) as tf:
-                for member in tf.getmembers():
-                    if member.name.endswith(("hapi/hapi.py", "hapi/__init__.py")):
-                        fh = tf.extractfile(member)
-                        (out / Path(member.name).name).write_bytes(fh.read())
+    # 直接取 PyPI 分发文件，不经 pip：pip download 在需要构建 sdist 时依赖构建环境与网络，
+    # 在干净的 CI 容器里不稳定（会 exit 1）。PyPI JSON API 的分发 URL 稳定可用。
+    meta_url = f"https://pypi.org/pypi/hitran-api/{HITRAN_API_VERSION}/json"
+    with urllib.request.urlopen(meta_url, timeout=60) as resp:
+        meta = json.loads(resp.read().decode("utf-8"))
+    files = meta.get("urls") or []
+    pick = (next((f for f in files if f["packagetype"] == "bdist_wheel"), None)
+            or next((f for f in files if f["packagetype"] == "sdist"), None))
+    if not pick:
+        raise SystemExit(f"PyPI 上没有 hitran-api {HITRAN_API_VERSION} 的分发文件")
+    print(f"  ↓ {pick['filename']}")
+    with urllib.request.urlopen(pick["url"], timeout=120) as resp:
+        blob = resp.read()
+    out.mkdir(parents=True, exist_ok=True)
+    if pick["filename"].endswith(".whl"):
+        with zipfile.ZipFile(io.BytesIO(blob)) as zf:
+            for member in ("hapi/hapi.py", "hapi/__init__.py"):
+                (out / Path(member).name).write_bytes(zf.read(member))
+    else:  # sdist
+        with tarfile.open(fileobj=io.BytesIO(blob)) as tf:
+            for member in tf.getmembers():
+                if member.name.endswith(("hapi/hapi.py", "hapi/__init__.py")):
+                    fh = tf.extractfile(member)
+                    (out / Path(member.name).name).write_bytes(fh.read())
     print(f"  ↓ py/vendor/hapi/hapi.py  ({HITRAN_API_VERSION})")
     (out / "LICENSE").write_text(
         "HAPI (hitran-api) is distributed under the MIT license.\n"
